@@ -193,6 +193,9 @@ print(cmtree_conf)
 
 ```
 From the following confusion matrix we can see that the overall accuracy dropped to 37.5%. We can see that the reason behind this is probably an over fitting of the data and due to the creation of the preselection of some variable with the PCA analysis we made at the begining. 
+the OOE would be around 63% when validated in a inner out ou sample testing
+
+In order to Cross Validate i would run a model rpart with the same specification.
 
 In real life here is the next step i would do to improve my model:
 - i would run the RF on the full spectrum of available variable
