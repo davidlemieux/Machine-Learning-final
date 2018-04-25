@@ -1,0 +1,229 @@
+---
+title: "Machine learning_coursera_peoject"
+author: "DLE"
+date: "24 avril 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(AppliedPredictiveModeling)
+library(rattle)
+library(dplyr)
+library(caret)
+library(doParallel)
+library(parallel)
+
+```
+
+## Data Analysis
+The goal of this analysis is to deepens our understading of activity types and predict the class (types of actvitities) the participants have made 
+
+#### Importing the Data
+Starting by importing the data and printing a preview of the training data to console
+We also select only the variable that have less than 30% of missing values in order to lighten the futur PCA, plotting and model
+
+```{r import data, echo = T}
+
+testing_data=read.csv("pml-testing.csv",header=T,sep=",",quote = "")
+
+
+training_data=read.csv("pml-training.csv",header=T,sep=",",quote = "")
+
+head(training_data[1:5,1:5])
+
+training_data <- data.frame(lapply(training_data,FUN=function(x){
+                  gsub('""""',NA,x)
+                  }))
+training_data <- data.frame(lapply(training_data,FUN=function(x){
+                  gsub('"',"",x)}))
+
+testing_data <- data.frame(lapply(testing_data,FUN=function(x){
+                  gsub('""""',NA,x)
+                  }))
+testing_data <- data.frame(lapply(testing_data,FUN=function(x){
+                  gsub('"',"",x)}))
+
+# remove column that are filed with Nas 
+to_keep <- colSums(is.na(training_data))/length(training_data$X.) <0.3
+to_keep <- names(training_data)[to_keep]
+
+
+training_cleaned <- training_data %>% select(to_keep)
+
+to_keep_name_testing <- names(testing_data) %in% names(training_data)
+
+training_cleaned <- training_cleaned[,to_keep]
+
+
+training_cleaned$X..classe... <- as.factor(training_cleaned$X..classe...)
+
+
+training_cleaned$X..raw_timestamp_part_1.. <- as.numeric(training_cleaned$X..raw_timestamp_part_1.. )
+# 
+training_cleaned$X..raw_timestamp_part_2.. <- as.numeric(training_cleaned$X..raw_timestamp_part_2..)
+to_keep <- colSums(is.na(testing_data))/length(testing_data$X.) <0.3
+to_keep <- names(testing_data)[to_keep]
+for (eachrow in seq(5,59)){
+  training_cleaned[,eachrow] <- as.numeric(training_cleaned[,eachrow])
+
+}
+
+training_cleaned_all <- training_cleaned
+
+rm(training_data)
+
+
+
+
+testing_cleaned <- testing_data %>% select(to_keep)
+
+
+testing_cleaned<- testing_cleaned[,to_keep]
+
+
+
+```
+
+#### Data Division
+In the following Question we will separate the whole training dataset in 2 separate dataset in order to test our model in the training dataset before we try to predict in the test dataset. From our training dataset we select 0.60 to train our model
+
+```{r preparing the 2 sub_dataset}
+intraining <- createDataPartition(training_cleaned_all$X..user_name..,p=0.7,list=F)
+training_cleaned <- training_cleaned_all[intraining,]
+training_for_testing <- training_cleaned_all[-intraining,]
+
+dim(training_cleaned)
+dim(training_for_testing)
+
+
+```
+
+
+
+
+## Training Variable plots 
+In this following graph we can see a plot for multiple variables ( the five first variable in the dataset) while this graph cannot teach us much due to the structure of the data it is still an interesting methodology to present.in order to complete the PCA, we started by converting the numerical variable from the factor variable.
+
+```{r training variable dataset plots, echo=F }
+featurePlot(x=training_cleaned[,1:5],y = training_cleaned$X..classe...,plot="pairs",main="Scatter plot for the 5 first variable in the training Data")
+```
+
+#### Variable Selection 
+In this section we will prensent a PCA analysis and will select the variable that will select 90% the variation
+```{r Variable Selection }
+
+training_pca <- prcomp(training_cleaned[5:59],center=T,scale.=T)
+
+pca_table <- data.frame(training_pca$rotation)
+sum_pca <- summary(training_pca)
+
+screeplot(training_pca,type="line")
+
+eig <- (training_pca$sdev)^2
+
+plot(eig,main="EigenValue of the PCA")
+
+
+
+
+
+``` 
+
+
+Using the Following PCA analysis, the number of quantitative variable that explain a important part of the variability is 6 with the PCA Graph.Because our first model only have a cumulative proportion of 43%, the final model will be built with 18 quantitative variable in order to acheive a cumulative variation of just above 70%. The 18 first eigenvalue are also a good pick because the eigenvalues are ploted abobe the "1" line in the secon plot above
+
+
+#### Model building
+As stated before, we will build a model. the model will be a random forest usng the 18 first  quantitatibe variable as well as all the factor variable converted in factor variable. the date were converted to numerical.
+
+My model ran on a Virtual machine and then imported on my local computer. The VM was 32 GRAM and 8 cores.
+
+
+``` {r Model building, echo = T }
+
+df_train1 <- training_cleaned[,c(2:24,60)]
+# 
+# 
+# 
+# 
+# cluster <- makeCluster(detectCores(logical=F)-1)
+# registerDoParallel(cluster)
+# 
+# control <- trainControl(method="cv", number=4,allowParallel = TRUE)
+# 
+# 
+# set.seed(123)
+# 
+# train_model_1 <- train(y=as.factor(df_train1$X..classe...),x= df_train1[,2:ncol(df_train1)-1], method="rf",trainControl=control,model = FALSE,verbose=FALSE)
+# 
+# stopCluster(cluster)
+#SaveRDS(train_model_1.RDS,"train_model_1.RDS")
+
+``` 
+
+
+## Model visualization
+The First table is a summary for the confusion matrix. we can see that our model fit the training dataset highly.
+
+The first Graph describe the error rate or misclassification depending with the number of trees 
+``` {r Decision Tree}
+train_model_1 <- readRDS("C:/Users/David/OneDrive/Coursera/Machine learning/train_model_1.RDS")
+
+
+print(train_model_1)
+print(train_model_1$finalModel$confusion)
+
+
+``` 
+
+The actual fitting on the trainded model for the trained section gives us an accuracy of 0.9985.
+
+## Prediction on the Testing portion of the training Data
+We will now predict on the testing dataset
+``` {r Prevision_in_sample, echo = T }
+df_check_train <- training_for_testing[,c(2:24,60)]
+prediction_confirmation_training <- predict(train_model_1,newdata=df_check_train[,-24])
+
+cmtree_conf <- confusionMatrix(prediction_confirmation_training,df_check_train$X..classe...)
+
+
+print(cmtree_conf)
+
+```
+From the following confusion matrix we can see that the overall accuracy dropped to 37.5%. We can see that the reason behind this is probably an over fitting of the data and due to the creation of the preselection of some variable with the PCA analysis we made at the begining. 
+
+In real life here is the next step i would do to improve my model:
+- i would run the RF on the full spectrum of available variable
+- i would preprocess the quantitative variables where i would center and scale the variables.
+- i would tune the parameters
+
+because i had to borrow a virtual machine to run the test it is difficult to make adjustment to the current model and it is clear that the goal is not to have the best model but tu understant the underlying mechanism.
+
+#### Prediction of OOS on the test set
+
+
+``` {r Prevision, echo = T }
+
+# we first need to configurate the testing dataset as the training dataset
+same_name <- names(testing_cleaned) %in% names(df_train1)
+to_keep <- names(testing_cleaned)[same_name]
+
+
+testing_cleaned <- testing_cleaned[,to_keep]
+testing_cleaned$X..raw_timestamp_part_1.. <- as.numeric(testing_cleaned$X..raw_timestamp_part_1..)
+testing_cleaned$X..raw_timestamp_part_2.. <- as.numeric(testing_cleaned$X..raw_timestamp_part_2..)
+
+for (eachrow in seq(4,23)){
+  testing_cleaned[,eachrow] <- as.numeric(testing_cleaned[,eachrow])
+
+}
+
+
+
+prediction_model_1 <- predict(train_model_1$finalModel,newdata=testing_cleaned)
+
+cmtree <- confusionMatrix(prediction_model_1,prediction_model_1)
+
+```
